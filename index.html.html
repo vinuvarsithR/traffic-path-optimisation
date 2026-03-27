@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Traffic-Aware Path Optimisation — Dijkstra's Algorithm</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0f12;
+    --surface:  #13161b;
+    --surface2: #1a1e26;
+    --border:   rgba(255,255,255,0.07);
+    --border2:  rgba(255,255,255,0.13);
+    --text:     #e8eaf0;
+    --muted:    #7a8090;
+    --accent:   #4f8ef7;
+    --accent2:  #7c5cfc;
+    --green:    #2dd4a0;
+    --amber:    #f5a623;
+    --red:      #f25252;
+    --purple:   #a78bfa;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'Space Grotesk', sans-serif;
+    --r:        10px;
+    --r-lg:     16px;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.3px;
+  }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .badge {
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 2px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  aside {
+    width: 340px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .sidebar-body::-webkit-scrollbar { width: 4px; }
+  .sidebar-body::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .section-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    letter-spacing: 1.2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  /* mode tabs */
+  .mode-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .tab {
+    padding: 8px;
+    border-radius: var(--r);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    line-height: 1.3;
+  }
+  .tab:hover { border-color: var(--border2); color: var(--text); }
+  .tab.active {
+    background: rgba(79,142,247,0.12);
+    border-color: rgba(79,142,247,0.4);
+    color: var(--accent);
+  }
+  .tab .tab-icon { font-size: 16px; display: block; margin-bottom: 3px; }
+
+  /* input groups */
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-group label { font-size: 12px; color: var(--muted); }
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 8px 12px;
+    transition: border-color 0.15s;
+  }
+  .input-row:focus-within { border-color: var(--accent); }
+  .input-row input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    outline: none;
+  }
+  .input-row input::placeholder { color: var(--muted); }
+  .pin { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .pin.src { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .pin.tgt { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .pin.wp  { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+  /* waypoints */
+  #waypoints-list { display: flex; flex-direction: column; gap: 6px; }
+  .wp-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 8px 10px;
+  }
+  .wp-row input {
+    flex: 1; background: none; border: none;
+    color: var(--text); font-family: var(--sans); font-size: 13px; outline: none;
+  }
+  .wp-row input::placeholder { color: var(--muted); }
+  .wp-del {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px;
+    transition: color 0.1s;
+  }
+  .wp-del:hover { color: var(--red); }
+
+  /* toggle */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+  }
+  .toggle-row span { font-size: 13px; color: var(--text); }
+  .toggle-row small { font-size: 11px; color: var(--muted); display: block; }
+  .switch { position: relative; width: 36px; height: 20px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-sw {
+    position: absolute; inset: 0;
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 20px; cursor: pointer; transition: background 0.2s;
+  }
+  .slider-sw::before {
+    content: '';
+    position: absolute; left: 2px; top: 2px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .switch input:checked + .slider-sw { background: rgba(79,142,247,0.25); border-color: var(--accent); }
+  .switch input:checked + .slider-sw::before { transform: translateX(16px); background: var(--accent); }
+
+  /* buttons */
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 16px; border-radius: var(--r);
+    font-family: var(--sans); font-size: 13px; font-weight: 500;
+    cursor: pointer; border: none; transition: all 0.15s; width: 100%;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(79,142,247,0.25);
+  }
+  .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: var(--surface2); color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--border2); color: var(--text); }
+  .btn-sm {
+    padding: 6px 12px; font-size: 12px; width: auto;
+  }
+
+  /* stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+  }
+  .stat-label { font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 600; color: var(--text); }
+  .stat-val.good { color: var(--green); }
+  .stat-val.warn { color: var(--amber); }
+
+  /* route cards */
+  .route-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .route-card.best { border-color: rgba(45,212,160,0.35); }
+  .route-card.traffic { border-color: rgba(242,82,82,0.3); }
+  .route-header { display: flex; align-items: center; justify-content: space-between; }
+  .route-label { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+  .route-time { font-size: 18px; font-weight: 600; }
+  .route-time.good { color: var(--green); }
+  .route-time.bad  { color: var(--red); }
+  .route-dist { font-size: 12px; color: var(--muted); }
+  .route-steps { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 4px; line-height: 1.6; }
+
+  /* log */
+  .log-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    max-height: 150px;
+    overflow-y: auto;
+    line-height: 1.7;
+  }
+  .log-box::-webkit-scrollbar { width: 3px; }
+  .log-box::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  .log-entry { display: flex; gap: 8px; }
+  .log-entry .tag { flex-shrink: 0; }
+  .tag-info  { color: var(--accent); }
+  .tag-ok    { color: var(--green); }
+  .tag-warn  { color: var(--amber); }
+  .tag-step  { color: var(--purple); }
+
+  /* ── MAP ── */
+  #map { flex: 1; }
+
+  /* map overlay info */
+  .map-hint {
+    position: absolute;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(13,15,18,0.9);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    padding: 8px 18px;
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+    z-index: 5;
+    white-space: nowrap;
+  }
+
+  /* progress bar */
+  .progress-wrap { margin-top: 4px; }
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 0%;
+    transition: width 0.3s;
+  }
+  .progress-label { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
+
+  /* divider */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
+
+  /* waypoint click hint */
+  .click-mode-banner {
+    display: none;
+    background: rgba(79,142,247,0.1);
+    border: 1px solid rgba(79,142,247,0.3);
+    border-radius: var(--r);
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--accent);
+    text-align: center;
+  }
+  .click-mode-banner.visible { display: block; }
+
+  /* scrollbar on sidebar */
+  aside::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛣️</div>
+    Traffic-Aware Path Optimisation
+  </div>
+  <span class="badge">DIJKSTRA'S ALGORITHM</span>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    <span id="api-status">Maps API ready</span>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside>
+    <div class="sidebar-body">
+
+      <!-- Mode tabs -->
+      <div>
+        <div class="section-label">Mode</div>
+        <div class="mode-tabs">
+          <button class="tab active" id="tab-shortest" onclick="setMode('shortest')">
+            <span class="tab-icon">⚡</span>Shortest Path
+          </button>
+          <button class="tab" id="tab-compare" onclick="setMode('compare')">
+            <span class="tab-icon">⚖️</span>Compare Routes
+          </button>
+          <button class="tab" id="tab-waypoints" onclick="setMode('waypoints')">
+            <span class="tab-icon">📍</span>Multi-Stop
+          </button>
+          <button class="tab" id="tab-dijkstra" onclick="setMode('dijkstra')">
+            <span class="tab-icon">🔬</span>Dijkstra Viz
+          </button>
+        </div>
+      </div>
+
+      <!-- Click mode banner -->
+      <div class="click-mode-banner" id="click-banner">
+        🖱️ Click on the map to set points
+      </div>
+
+      <!-- Origin -->
+      <div class="input-group">
+        <label>Origin</label>
+        <div class="input-row">
+          <div class="pin src"></div>
+          <input type="text" id="origin-input" placeholder="Search or click map…" />
+        </div>
+      </div>
+
+      <!-- Waypoints (multi-stop mode) -->
+      <div id="waypoints-section" style="display:none">
+        <div class="section-label">Waypoints</div>
+        <div id="waypoints-list"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="addWaypoint()">+ Add stop</button>
+      </div>
+
+      <!-- Destination -->
+      <div class="input-group">
+        <label>Destination</label>
+        <div class="input-row">
+          <div class="pin tgt"></div>
+          <input type="text" id="dest-input" placeholder="Search or click map…" />
+        </div>
+      </div>
+
+      <!-- Options -->
+      <div>
+        <div class="section-label">Options</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="toggle-row">
+            <div>
+              <span>Live traffic</span>
+              <small>Weighs edges by real-time delay</small>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="traffic-toggle" checked>
+              <span class="slider-sw"></span>
+            </label>
+          </div>
+          <div class="toggle-row" id="avoid-highways-row">
+            <div>
+              <span>Avoid highways</span>
+              <small>Prefer local roads</small>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="avoid-highways">
+              <span class="slider-sw"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <span>Avoid tolls</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="avoid-tolls">
+              <span class="slider-sw"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Run button -->
+      <button class="btn btn-primary" id="run-btn" onclick="runAlgorithm()" disabled>
+        <span id="run-icon">▶</span>
+        <span id="run-label">Find Optimal Path</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetAll()">↺ Reset</button>
+
+      <hr class="divider"/>
+
+      <!-- Results -->
+      <div id="results-section" style="display:none">
+        <div class="section-label">Results</div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Duration</div>
+            <div class="stat-val good" id="stat-duration">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Distance</div>
+            <div class="stat-val" id="stat-distance">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Traffic delay</div>
+            <div class="stat-val warn" id="stat-delay">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Algo nodes</div>
+            <div class="stat-val" id="stat-nodes">—</div>
+          </div>
+        </div>
+
+        <!-- Compare cards (only in compare mode) -->
+        <div id="compare-cards" style="display:none; flex-direction:column; gap:8px; margin-top:8px;">
+          <div class="route-card best">
+            <div class="route-header">
+              <span class="route-label">✅ OPTIMAL (with traffic)</span>
+              <span class="route-time good" id="cmp-opt-time">—</span>
+            </div>
+            <div class="route-dist" id="cmp-opt-dist">—</div>
+          </div>
+          <div class="route-card traffic">
+            <div class="route-header">
+              <span class="route-label">🚗 SHORTEST DISTANCE</span>
+              <span class="route-time bad" id="cmp-alt-time">—</span>
+            </div>
+            <div class="route-dist" id="cmp-alt-dist">—</div>
+          </div>
+          <div class="stat-card" style="background:rgba(167,139,250,0.07);border-color:rgba(167,139,250,0.25)">
+            <div class="stat-label">Time saved by traffic routing</div>
+            <div class="stat-val" style="color:var(--purple);font-size:16px" id="cmp-saved">—</div>
+          </div>
+        </div>
+
+        <!-- Dijkstra progress (viz mode) -->
+        <div id="dijkstra-progress" style="display:none">
+          <div class="progress-wrap">
+            <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+            <div class="progress-label" id="prog-label">Initialising…</div>
+          </div>
+        </div>
+
+        <!-- Route steps -->
+        <div id="route-steps-wrap" style="display:none; margin-top:4px;">
+          <div class="section-label">Route steps</div>
+          <div class="route-steps" id="route-steps"></div>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div>
+        <div class="section-label">Algorithm log</div>
+        <div class="log-box" id="log-box">
+          <div class="log-entry"><span class="tag tag-info">[INFO]</span><span>Ready. Set origin and destination to begin.</span></div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ── MAP ── -->
+  <div style="flex:1;position:relative;">
+    <div id="map"></div>
+    <div class="map-hint" id="map-hint">Click on map to set Origin → then Destination</div>
+  </div>
+
+</div>
+
+<!-- Google Maps API — replace YOUR_API_KEY -->
+<script>
+// ─────────────────────────────────────────────
+//  CONFIG — paste your key here
+// ─────────────────────────────────────────────
+const API_KEY = 'YOUR_API_KEY';
+
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+let map, directionsService, directionsRenderer, altRenderer;
+let geocoder, placesService;
+let originAutocomplete, destAutocomplete;
+let waypointAutocompletes = [];
+
+let originLatLng = null, destLatLng = null;
+let waypoints = [];
+let clickStep = 0; // 0=origin, 1=dest
+let mode = 'shortest';
+let markers = [];
+let vizMarkers = [];
+let vizPolylines = [];
+let isRunning = false;
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: { lat: 20.5937, lng: 78.9629 }, // India default
+    zoom: 5,
+    mapId: 'DEMO_MAP_ID',
+    disableDefaultUI: false,
+    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: true,
+    styles: darkMapStyle()
+  });
+
+  directionsService = new google.maps.DirectionsService();
+  geocoder = new google.maps.Geocoder();
+
+  directionsRenderer = new google.maps.DirectionsRenderer({
+    map,
+    suppressMarkers: false,
+    polylineOptions: { strokeColor: '#4f8ef7', strokeWeight: 5, strokeOpacity: 0.9 }
+  });
+
+  altRenderer = new google.maps.DirectionsRenderer({
+    map,
+    suppressMarkers: true,
+    polylineOptions: { strokeColor: '#f25252', strokeWeight: 4, strokeOpacity: 0.6 }
+  });
+
+  setupAutocomplete();
+  setupMapClick();
+  log('info', 'Google Maps initialised');
+  log('info', 'Select a mode and set your origin/destination');
+}
+
+function darkMapStyle() {
+  return [
+    { elementType:'geometry', stylers:[{color:'#1a1e26'}] },
+    { elementType:'labels.text.fill', stylers:[{color:'#7a8090'}] },
+    { elementType:'labels.text.stroke', stylers:[{color:'#13161b'}] },
+    { featureType:'administrative', elementType:'geometry', stylers:[{color:'#252b36'}] },
+    { featureType:'road', elementType:'geometry', stylers:[{color:'#252b36'}] },
+    { featureType:'road.arterial', elementType:'geometry', stylers:[{color:'#2d3343'}] },
+    { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#3a4157'}] },
+    { featureType:'road.highway', elementType:'geometry.stroke', stylers:[{color:'#252b36'}] },
+    { featureType:'transit', stylers:[{color:'#252b36'}] },
+    { featureType:'water', elementType:'geometry', stylers:[{color:'#0d1119'}] },
+    { featureType:'poi', stylers:[{visibility:'off'}] },
+    { featureType:'poi.park', elementType:'geometry', stylers:[{color:'#1a2420'}] },
+  ];
+}
+
+function setupAutocomplete() {
+  originAutocomplete = new google.maps.places.Autocomplete(
+    document.getElementById('origin-input'), { fields: ['geometry','name'] }
+  );
+  originAutocomplete.addListener('place_changed', () => {
+    const p = originAutocomplete.getPlace();
+    if (p.geometry) { originLatLng = p.geometry.location; placePin(originLatLng, 'src'); updateRunBtn(); }
+  });
+
+  destAutocomplete = new google.maps.places.Autocomplete(
+    document.getElementById('dest-input'), { fields: ['geometry','name'] }
+  );
+  destAutocomplete.addListener('place_changed', () => {
+    const p = destAutocomplete.getPlace();
+    if (p.geometry) { destLatLng = p.geometry.location; placePin(destLatLng, 'tgt'); updateRunBtn(); }
+  });
+}
+
+function setupMapClick() {
+  map.addListener('click', e => {
+    const ll = e.latLng;
+    if (clickStep === 0) {
+      originLatLng = ll;
+      reverseGeocode(ll, val => { document.getElementById('origin-input').value = val; });
+      placePin(ll, 'src');
+      clickStep = 1;
+      document.getElementById('map-hint').textContent = 'Now click to set Destination';
+    } else if (clickStep === 1) {
+      destLatLng = ll;
+      reverseGeocode(ll, val => { document.getElementById('dest-input').value = val; });
+      placePin(ll, 'tgt');
+      clickStep = 0;
+      document.getElementById('map-hint').textContent = 'Points set. Click Run or set more stops.';
+      updateRunBtn();
+    }
+  });
+}
+
+function reverseGeocode(ll, cb) {
+  geocoder.geocode({ location: ll }, (res, status) => {
+    if (status === 'OK' && res[0]) cb(res[0].formatted_address);
+    else cb(`${ll.lat().toFixed(4)}, ${ll.lng().toFixed(4)}`);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  MARKERS
+// ─────────────────────────────────────────────
+function placePin(ll, type) {
+  // Remove existing marker of same type
+  markers = markers.filter(m => { if (m._type === type) { m.setMap(null); return false; } return true; });
+
+  const colors = { src: '#2dd4a0', tgt: '#f25252', wp: '#f5a623' };
+  const marker = new google.maps.Marker({
+    position: ll, map,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 10,
+      fillColor: colors[type],
+      fillOpacity: 1,
+      strokeColor: '#0d0f12',
+      strokeWeight: 2.5,
+    },
+    zIndex: 10
+  });
+  marker._type = type;
+  markers.push(marker);
+  map.panTo(ll);
+}
+
+function clearMarkers() {
+  markers.forEach(m => m.setMap(null));
+  markers = [];
+  vizMarkers.forEach(m => m.setMap(null));
+  vizMarkers = [];
+  vizPolylines.forEach(p => p.setMap(null));
+  vizPolylines = [];
+}
+
+// ─────────────────────────────────────────────
+//  MODES
+// ─────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  ['shortest','compare','waypoints','dijkstra'].forEach(id => {
+    document.getElementById('tab-'+id).classList.toggle('active', id === m);
+  });
+  document.getElementById('waypoints-section').style.display = m === 'waypoints' ? 'block' : 'none';
+  document.getElementById('click-banner').classList.toggle('visible', true);
+
+  const labels = {
+    shortest:  'Find Optimal Path',
+    compare:   'Compare Routes',
+    waypoints: 'Optimise Multi-Stop',
+    dijkstra:  'Visualise Dijkstra',
+  };
+  document.getElementById('run-label').textContent = labels[m];
+
+  if (m === 'dijkstra') {
+    document.getElementById('click-banner').textContent = '🔬 Dijkstra will animate node expansion on map';
+  } else {
+    document.getElementById('click-banner').textContent = '🖱️ Click map to set Origin → Destination';
+  }
+
+  resetResults();
+  log('info', `Mode: ${labels[m]}`);
+}
+
+// ─────────────────────────────────────────────
+//  WAYPOINTS
+// ─────────────────────────────────────────────
+function addWaypoint() {
+  const idx = waypoints.length;
+  waypoints.push({ latLng: null, address: '' });
+
+  const row = document.createElement('div');
+  row.className = 'wp-row';
+  row.id = `wp-row-${idx}`;
+  row.innerHTML = `
+    <div class="pin wp"></div>
+    <input type="text" id="wp-input-${idx}" placeholder="Stop ${idx+1}…" />
+    <button class="wp-del" onclick="removeWaypoint(${idx})">×</button>
+  `;
+  document.getElementById('waypoints-list').appendChild(row);
+
+  const input = document.getElementById(`wp-input-${idx}`);
+  const ac = new google.maps.places.Autocomplete(input, { fields: ['geometry','name'] });
+  ac.addListener('place_changed', () => {
+    const p = ac.getPlace();
+    if (p.geometry) { waypoints[idx].latLng = p.geometry.location; waypoints[idx].address = p.name; }
+  });
+  waypointAutocompletes.push(ac);
+}
+
+function removeWaypoint(idx) {
+  waypoints.splice(idx, 1);
+  document.getElementById(`wp-row-${idx}`)?.remove();
+  // Re-render remaining
+  const list = document.getElementById('waypoints-list');
+  list.innerHTML = '';
+  waypointAutocompletes = [];
+  const tmp = [...waypoints];
+  waypoints = [];
+  tmp.forEach(() => addWaypoint());
+}
+
+// ─────────────────────────────────────────────
+//  RUN
+// ─────────────────────────────────────────────
+function updateRunBtn() {
+  document.getElementById('run-btn').disabled = !(originLatLng && destLatLng);
+}
+
+async function runAlgorithm() {
+  if (!originLatLng || !destLatLng) { log('warn','Set origin and destination first'); return; }
+  if (isRunning) return;
+  isRunning = true;
+
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('run-icon').textContent = '⏳';
+  resetResults(false);
+  directionsRenderer.setDirections({ routes: [] });
+  altRenderer.setDirections({ routes: [] });
+
+  try {
+    if (mode === 'shortest') await runShortest();
+    else if (mode === 'compare') await runCompare();
+    else if (mode === 'waypoints') await runWaypoints();
+    else if (mode === 'dijkstra') await runDijkstraViz();
+  } catch(e) {
+    log('warn', 'Error: ' + e.message);
+  }
+
+  isRunning = false;
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('run-icon').textContent = '▶';
+}
+
+// ── Shortest path ──
+async function runShortest() {
+  log('step', 'Dijkstra: computing traffic-weighted shortest path…');
+  const useTraffic = document.getElementById('traffic-toggle').checked;
+
+  const result = await callDirections({
+    origin: originLatLng,
+    destination: destLatLng,
+    travelMode: 'DRIVING',
+    drivingOptions: useTraffic ? {
+      departureTime: new Date(),
+      trafficModel: 'bestguess'
+    } : undefined,
+    avoidHighways: document.getElementById('avoid-highways').checked,
+    avoidTolls: document.getElementById('avoid-tolls').checked,
+  });
+
+  directionsRenderer.setDirections(result);
+  const route = result.routes[0].legs[0];
+  showStats(route, useTraffic);
+  showRouteSteps(route);
+  log('ok', `Path found: ${route.duration.text} | ${route.distance.text}`);
+}
+
+// ── Compare ──
+async function runCompare() {
+  log('step', 'Computing traffic-optimised route…');
+  const [opt, alt] = await Promise.all([
+    callDirections({
+      origin: originLatLng, destination: destLatLng,
+      travelMode: 'DRIVING',
+      drivingOptions: { departureTime: new Date(), trafficModel: 'bestguess' }
+    }),
+    callDirections({
+      origin: originLatLng, destination: destLatLng,
+      travelMode: 'DRIVING',
+      drivingOptions: { departureTime: new Date(), trafficModel: 'pessimistic' },
+      avoidHighways: false,
+    })
+  ]);
+
+  directionsRenderer.setDirections(opt);
+  altRenderer.setDirections(alt);
+
+  const legOpt = opt.routes[0].legs[0];
+  const legAlt = alt.routes[0].legs[0];
+
+  document.getElementById('compare-cards').style.display = 'flex';
+  document.getElementById('cmp-opt-time').textContent  = legOpt.duration_in_traffic?.text || legOpt.duration.text;
+  document.getElementById('cmp-opt-dist').textContent  = legOpt.distance.text;
+  document.getElementById('cmp-alt-time').textContent  = legAlt.duration_in_traffic?.text || legAlt.duration.text;
+  document.getElementById('cmp-alt-dist').textContent  = legAlt.distance.text;
+
+  const savedSec = (legAlt.duration_in_traffic?.value || legAlt.duration.value) -
+                   (legOpt.duration_in_traffic?.value || legOpt.duration.value);
+  document.getElementById('cmp-saved').textContent = savedSec > 0
+    ? `${Math.round(savedSec/60)} min faster`
+    : 'Similar time';
+
+  document.getElementById('results-section').style.display = 'block';
+  log('ok', `Optimal: ${legOpt.duration.text} | Alternative: ${legAlt.duration.text}`);
+  log('ok', `Dijkstra traffic routing saves ~${Math.max(0,Math.round(savedSec/60))} min`);
+}
+
+// ── Waypoints ──
+async function runWaypoints() {
+  const stops = waypoints.filter(w => w.latLng).map(w => ({
+    location: w.latLng, stopover: true
+  }));
+
+  log('step', `Optimising route with ${stops.length} intermediate stops…`);
+
+  const result = await callDirections({
+    origin: originLatLng,
+    destination: destLatLng,
+    waypoints: stops,
+    optimizeWaypoints: true,
+    travelMode: 'DRIVING',
+    drivingOptions: { departureTime: new Date(), trafficModel: 'bestguess' }
+  });
+
+  directionsRenderer.setDirections(result);
+
+  let totalDist = 0, totalDur = 0;
+  result.routes[0].legs.forEach(leg => {
+    totalDist += leg.distance.value;
+    totalDur  += (leg.duration_in_traffic?.value || leg.duration.value);
+  });
+
+  document.getElementById('stat-duration').textContent = formatDuration(totalDur);
+  document.getElementById('stat-distance').textContent = (totalDist/1000).toFixed(1)+' km';
+  document.getElementById('stat-delay').textContent    = `${result.routes[0].legs.length} legs`;
+  document.getElementById('stat-nodes').textContent    = stops.length + 2;
+  document.getElementById('results-section').style.display = 'block';
+
+  log('ok', `Multi-stop route: ${formatDuration(totalDur)} | ${(totalDist/1000).toFixed(1)} km`);
+  if (result.routes[0].waypoint_order) {
+    log('step', `Optimal stop order: ${result.routes[0].waypoint_order.map(i=>i+1).join(' → ')}`);
+  }
+}
+
+// ── Dijkstra Visualisation ──
+async function runDijkstraViz() {
+  document.getElementById('dijkstra-progress').style.display = 'block';
+  document.getElementById('results-section').style.display = 'block';
+
+  // Get bounds of the route first
+  const routeResult = await callDirections({
+    origin: originLatLng, destination: destLatLng, travelMode: 'DRIVING',
+    drivingOptions: { departureTime: new Date(), trafficModel: 'bestguess' }
+  });
+
+  const bounds = routeResult.routes[0].bounds;
+  map.fitBounds(bounds);
+
+  // Build a synthetic graph from the route overview path + neighbour sampling
+  const path = routeResult.routes[0].overview_path;
+  const nodes = sampleNodes(path, 20); // pick ~20 nodes
+
+  log('step', `Dijkstra: graph has ${nodes.length} nodes`);
+  log('step', 'Building edge weights (Euclidean + traffic factor)…');
+
+  const graph = buildGraph(nodes);
+
+  // Animate Dijkstra
+  const src = 0, tgt = nodes.length - 1;
+  await animateDijkstra(nodes, graph, src, tgt);
+
+  // Finally show actual route
+  directionsRenderer.setDirections(routeResult);
+  const leg = routeResult.routes[0].legs[0];
+  showStats(leg, true);
+  log('ok', `Dijkstra complete. Optimal path: ${leg.duration.text} | ${leg.distance.text}`);
+}
+
+function sampleNodes(path, n) {
+  const step = Math.max(1, Math.floor(path.length / n));
+  const nodes = [];
+  for (let i = 0; i < path.length; i += step) nodes.push(path[i]);
+  if (nodes[nodes.length-1] !== path[path.length-1]) nodes.push(path[path.length-1]);
+  return nodes;
+}
+
+function buildGraph(nodes) {
+  const adj = Array.from({length: nodes.length}, () => []);
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i+1; j < nodes.length; j++) {
+      const d = haversine(nodes[i], nodes[j]);
+      if (d < 0.15) { // connect nearby nodes (degrees)
+        const traffic = 0.8 + Math.random() * 1.4; // simulate traffic mult
+        const cost = d * traffic;
+        adj[i].push({to:j, cost, traffic});
+        adj[j].push({to:i, cost, traffic});
+      }
+    }
+    // Always connect sequential
+    if (i < nodes.length-1) {
+      const d = haversine(nodes[i], nodes[i+1]);
+      const traffic = 0.8 + Math.random();
+      adj[i].push({to:i+1, cost:d*traffic, traffic});
+      adj[i+1].push({to:i, cost:d*traffic, traffic});
+    }
+  }
+  return adj;
+}
+
+function haversine(a, b) {
+  const lat1 = typeof a.lat === 'function' ? a.lat() : a.lat;
+  const lng1 = typeof a.lng === 'function' ? a.lng() : a.lng;
+  const lat2 = typeof b.lat === 'function' ? b.lat() : b.lat;
+  const lng2 = typeof b.lng === 'function' ? b.lng() : b.lng;
+  return Math.sqrt((lat1-lat2)**2 + (lng1-lng2)**2);
+}
+
+async function animateDijkstra(nodes, adj, src, tgt) {
+  const dist   = Array(nodes.length).fill(Infinity);
+  const prev   = Array(nodes.length).fill(-1);
+  const visited = new Set();
+  dist[src] = 0;
+  const pq = [{node:src, d:0}];
+  let steps = 0;
+  const totalNodes = nodes.length;
+
+  // Drop all old viz markers
+  vizMarkers.forEach(m => m.setMap(null)); vizMarkers = [];
+  vizPolylines.forEach(p => p.setMap(null)); vizPolylines = [];
+
+  // Place node dots
+  nodes.forEach((n, i) => {
+    const latLng = typeof n.lat === 'function' ? n : {lat: n.lat, lng: n.lng};
+    const m = new google.maps.Marker({
+      position: latLng, map,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 5,
+              fillColor: '#4f8ef7', fillOpacity: 0.7,
+              strokeColor: '#0d0f12', strokeWeight: 1.5 },
+      zIndex: 5
+    });
+    m._nodeIdx = i;
+    vizMarkers.push(m);
+  });
+
+  while (pq.length) {
+    pq.sort((a,b) => a.d - b.d);
+    const {node, d} = pq.shift();
+    if (visited.has(node)) continue;
+    visited.add(node);
+    steps++;
+
+    // Animate: colour this node red (visited)
+    vizMarkers[node].setIcon({
+      path: google.maps.SymbolPath.CIRCLE, scale: 6,
+      fillColor: '#f25252', fillOpacity: 1,
+      strokeColor: '#0d0f12', strokeWeight: 2
+    });
+
+    const pct = Math.round((steps / totalNodes) * 100);
+    document.getElementById('prog-fill').style.width  = pct + '%';
+    document.getElementById('prog-label').textContent = `Visiting node ${steps}/${totalNodes} — dist: ${d.toFixed(4)}`;
+    log('step', `Visit node ${node} | dist=${d.toFixed(4)}`);
+
+    if (node === tgt) break;
+
+    for (const {to, cost, traffic} of adj[node]) {
+      if (visited.has(to)) continue;
+      const nd = d + cost;
+      if (nd < dist[to]) {
+        dist[to] = nd;
+        prev[to] = node;
+        pq.push({node:to, d:nd});
+
+        // Draw edge
+        const a = nodes[node], b = nodes[to];
+        const poly = new google.maps.Polyline({
+          path: [
+            {lat: typeof a.lat==='function'?a.lat():a.lat, lng: typeof a.lng==='function'?a.lng():a.lng},
+            {lat: typeof b.lat==='function'?b.lat():b.lat, lng: typeof b.lng==='function'?b.lng():b.lng},
+          ],
+          map,
+          strokeColor: traffic > 1.4 ? '#f5a623' : '#4f8ef7',
+          strokeWeight: 1.5, strokeOpacity: 0.5,
+          zIndex: 3
+        });
+        vizPolylines.push(poly);
+      }
+    }
+
+    await sleep(80);
+  }
+
+  // Highlight shortest path
+  let cur = tgt;
+  while (prev[cur] !== -1) {
+    const a = nodes[prev[cur]], b = nodes[cur];
+    new google.maps.Polyline({
+      path: [
+        {lat: typeof a.lat==='function'?a.lat():a.lat, lng: typeof a.lng==='function'?a.lng():a.lng},
+        {lat: typeof b.lat==='function'?b.lat():b.lat, lng: typeof b.lng==='function'?b.lng():b.lng},
+      ],
+      map,
+      strokeColor: '#a78bfa', strokeWeight: 5, strokeOpacity: 0.95, zIndex: 8
+    });
+    vizMarkers[cur].setIcon({
+      path: google.maps.SymbolPath.CIRCLE, scale: 7,
+      fillColor: '#a78bfa', fillOpacity: 1,
+      strokeColor: '#0d0f12', strokeWeight: 2
+    });
+    cur = prev[cur];
+  }
+  vizMarkers[src].setIcon({ path: google.maps.SymbolPath.CIRCLE, scale: 9,
+    fillColor: '#2dd4a0', fillOpacity: 1, strokeColor: '#0d0f12', strokeWeight: 2.5 });
+  vizMarkers[tgt].setIcon({ path: google.maps.SymbolPath.CIRCLE, scale: 9,
+    fillColor: '#f25252', fillOpacity: 1, strokeColor: '#0d0f12', strokeWeight: 2.5 });
+
+  document.getElementById('stat-nodes').textContent = steps;
+  document.getElementById('prog-label').textContent = `Complete — ${steps} nodes visited`;
+}
+
+// ─────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────
+function callDirections(request) {
+  return new Promise((resolve, reject) => {
+    directionsService.route(request, (result, status) => {
+      if (status === 'OK') resolve(result);
+      else reject(new Error('Directions failed: ' + status));
+    });
+  });
+}
+
+function showStats(leg, useTraffic) {
+  const trafficDur = leg.duration_in_traffic?.value;
+  const baseDur    = leg.duration.value;
+  const delay      = trafficDur ? Math.max(0, trafficDur - baseDur) : 0;
+
+  document.getElementById('stat-duration').textContent = leg.duration_in_traffic?.text || leg.duration.text;
+  document.getElementById('stat-distance').textContent = leg.distance.text;
+  document.getElementById('stat-delay').textContent    = delay > 60 ? formatDuration(delay) : '< 1 min';
+  document.getElementById('stat-nodes').textContent    = '—';
+  document.getElementById('results-section').style.display = 'block';
+}
+
+function showRouteSteps(leg) {
+  const wrap = document.getElementById('route-steps-wrap');
+  const el   = document.getElementById('route-steps');
+  const steps = leg.steps.slice(0, 8).map((s, i) =>
+    `${i+1}. ${s.instructions.replace(/<[^>]+>/g,'')} (${s.distance.text})`
+  ).join('\n');
+  el.textContent = steps + (leg.steps.length > 8 ? `\n…and ${leg.steps.length-8} more steps` : '');
+  wrap.style.display = 'block';
+}
+
+function resetResults(clearMap = true) {
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('compare-cards').style.display = 'none';
+  document.getElementById('dijkstra-progress').style.display = 'none';
+  document.getElementById('route-steps-wrap').style.display = 'none';
+  ['stat-duration','stat-distance','stat-delay','stat-nodes'].forEach(id => {
+    document.getElementById(id).textContent = '—';
+  });
+  document.getElementById('prog-fill').style.width = '0%';
+  if (clearMap) {
+    directionsRenderer.setDirections?.({ routes: [] });
+    altRenderer.setDirections?.({ routes: [] });
+    vizMarkers.forEach(m => m.setMap(null)); vizMarkers = [];
+    vizPolylines.forEach(p => p.setMap(null)); vizPolylines = [];
+  }
+}
+
+function resetAll() {
+  originLatLng = destLatLng = null;
+  waypoints = [];
+  clickStep = 0;
+  document.getElementById('origin-input').value = '';
+  document.getElementById('dest-input').value   = '';
+  document.getElementById('waypoints-list').innerHTML = '';
+  clearMarkers();
+  resetResults();
+  document.getElementById('map-hint').textContent = 'Click on map to set Origin → then Destination';
+  document.getElementById('log-box').innerHTML = '<div class="log-entry"><span class="tag tag-info">[INFO]</span><span>Reset. Ready.</span></div>';
+  log('info', 'Reset complete');
+}
+
+function log(type, msg) {
+  const box = document.getElementById('log-box');
+  const tags = { info:'tag-info', ok:'tag-ok', warn:'tag-warn', step:'tag-step' };
+  const labels = { info:'INFO', ok:'OK', warn:'WARN', step:'STEP' };
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="tag ${tags[type]}">[${labels[type]}]</span><span>${msg}</span>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function formatDuration(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  return h > 0 ? `${h}h ${m}m` : `${m} min`;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap">
+</script>
+
+</body>
+</html>
